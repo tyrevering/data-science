@@ -1,0 +1,68 @@
+---
+title: "Tidying Linear Models for Company Facilities"
+author: "Tyler Revering"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**This code is based off of client work that I did for a company that offers services at various facilities and locations. They wanted to have a linear model for each one of their facilities based on how many visitors they brought in per week. Using tidy and nest functions, I aimed to create linear model objects based off of each facilities weekly visitors**
+
+```{r}
+# Loading the required libraries
+library(tidyr)
+library(purrr)
+library(broom)
+library(dplyr)
+library(nestr)
+library(tidyverse)
+library(scales)
+```
+**Off of data that was engineered prior to this analysis, there is data available for this physical therapy company's individual facilities and how many visitors they brought in per week.**
+```{r}
+# Loading the required data
+load("TrendAnalysis.RData")
+
+# For privacy purposes, not selecting the company and name of facility
+facilitiesweek %>%
+  select(WeekEndDate, TotalPatientVisits)
+```
+
+**Using the week dates, and total patient visits, I aimed to make linear model objects based off of each facilities weekly visitors.**
+
+```{r}
+# Using the tidyr and nest packages to make objects of linear models
+facilitiesweek_lm <- facilitiesweek %>%
+  nest(.by = c(CompanyName, FacilityName)) %>%
+  mutate(model=map(data, ~lm(TotalPatientVisits~WeekEndDate, data = .)),
+        tidied = map(model, tidy))
+
+# Rows of linear model and tidied model objects
+facilitiesweek_lm %>%
+  select(model, tidied)
+```
+
+**To analyze the trends of some, we can analyze one of the linear models, which will portray the trends of their weekly visitors depending on the date, and their estimate and statistical significance.**
+
+```{r}
+# Using unnesting of the tidied objects which contains coefficients and intercepts of the model
+slopes <- facilitiesweek_lm %>%
+  unnest(tidied) %>%
+  filter(term=="WeekEndDate") %>%
+  mutate(p.adjusted = p.adjust(p.value)) %>%
+  filter(p.adjusted < 0.5) %>% # Filtering for statistically significant estimates.
+  select(estimate, p.adjusted)
+```
+
+**Now to view the results of the varying facilities, we will view our model's results, still without facility names, by descending estimates**
+
+```{r}
+slopes %>%
+  arrange(desc(estimate))
+```
+
+**Considering that the client is aware of the facility names as they relate to the linear model objects, they can see the trends of weekly visitors, how their visitors change week on week throughout longer time horizons, and how statistically significant the models are.**
+
+**Future steps as it pertains to this project is using the model objects to forecast the visitors that each facility might bring in for the next year**
